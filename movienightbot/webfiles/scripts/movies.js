@@ -18,13 +18,7 @@ function MovieNightBotConstructor() {
 	this.maxAverageVotePower = 0;
 	this.maxAveragePopularity = 0;
 
-	this.healthRed = new Vector3();
-	this.healthGreen = new Vector3();
-
 	this.Init = function() {
-
-		this.healthRed.Set(0.7, 0.0, 0.1);
-		this.healthGreen.Set(0.0, 0.5, 0.2);
 
 		this.items = document.querySelector("#Items");
 		this.txtPositionP = document.querySelector("#PageControls > #Position > p");
@@ -57,13 +51,16 @@ function MovieNightBotConstructor() {
 			}
 		}
 
-		let arr = window.location.href.split("/");
-		let request = arr[0] + "//" + arr[2];
+		// let arr = window.location.href.split("/");
+		// let request = arr[0] + "//" + arr[2];
 
-		if (this.bGetSuggested)
-			request += "/json" + window.location.pathname;
-		else
-			request += "/json" + window.location.pathname;
+		// if (this.bGetSuggested)
+		// 	request += "/json" + window.location.pathname;
+		// else
+		// 	request += "/json" + window.location.pathname;
+		let viewOption = Utility.GetQueryValue('view');
+		let request = "/json/" + viewOption + "?server=" + Utility.GetQueryValue('server');
+		console.log(request);
 		
 		xhttp.open("GET", request, true);
 		xhttp.send();
@@ -201,6 +198,10 @@ function MovieNightBotConstructor() {
 		}
 	}
 
+	this.OnClickBtnVote = function() {
+		window.location.href = "/vote.html?server=" + Utility.GetQueryValue('server');
+	}
+
 	this.OnClickBtnLetter = function(event) {
 		//console.log(event.target.getAttribute("data-letter"));
 		let clicked = event.target.getAttribute("data-letter");
@@ -259,12 +260,17 @@ function MovieNightBotConstructor() {
         return result;
 	}
 
-	this.SortyByTitle = function() {
-		console.log("Sorting by title");
-		document.querySelector("#BtnSortByTitle .bullet").classList.add("selected");
+	this.UnselectAllBullets = function() {
+		document.querySelector("#BtnSortByTitle .bullet").classList.remove("selected");
 		document.querySelector("#BtnSortBySuggestor .bullet").classList.remove("selected");
 		document.querySelector("#BtnSortBySuggestDate .bullet").classList.remove("selected");
 		document.querySelector("#BtnSortByWatchDate .bullet").classList.remove("selected");
+		document.querySelector("#BtnSortByVoteCount .bullet").classList.remove("selected");
+	}
+
+	this.SortyByTitle = function() {
+	    this.UnselectAllBullets();
+		document.querySelector("#BtnSortByTitle .bullet").classList.add("selected");
 		this.SortData((a, b) => {
 			let aTitle = MovieNightBot.FilterMovieTitle(a.title);
 			let bTitle = MovieNightBot.FilterMovieTitle(b.title);
@@ -273,11 +279,8 @@ function MovieNightBotConstructor() {
 	}
 
 	this.SortBySuggestor = function() {
-		console.log("Sorting by suggestor");
-		document.querySelector("#BtnSortByTitle .bullet").classList.remove("selected");
+	    this.UnselectAllBullets();
 		document.querySelector("#BtnSortBySuggestor .bullet").classList.add("selected");
-		document.querySelector("#BtnSortBySuggestDate .bullet").classList.remove("selected");
-		document.querySelector("#BtnSortByWatchDate .bullet").classList.remove("selected");
 		this.SortData((a, b) => {
 			let val = a.suggestor.localeCompare(b.suggestor);
 			if (val == 0) {
@@ -290,11 +293,8 @@ function MovieNightBotConstructor() {
 	}
 
 	this.SortBySuggestDate = function() {
-		console.log("Sorting by suggest date");
-		document.querySelector("#BtnSortByTitle .bullet").classList.remove("selected");
-		document.querySelector("#BtnSortBySuggestor .bullet").classList.remove("selected");
+	    this.UnselectAllBullets();
 		document.querySelector("#BtnSortBySuggestDate .bullet").classList.add("selected");
-		document.querySelector("#BtnSortByWatchDate .bullet").classList.remove("selected");
 		this.SortData((a, b) => {
 			let dateA = new Date(a.date_suggested);
 			let dateB = new Date(b.date_suggested);
@@ -303,14 +303,27 @@ function MovieNightBotConstructor() {
 	}
 
 	this.SortByWatchDate = function() {
-		document.querySelector("#BtnSortByTitle .bullet").classList.remove("selected");
-		document.querySelector("#BtnSortBySuggestor .bullet").classList.remove("selected");
-		document.querySelector("#BtnSortBySuggestDate .bullet").classList.remove("selected");
+	    this.UnselectAllBullets();
 		document.querySelector("#BtnSortByWatchDate .bullet").classList.add("selected");
 		this.SortData((a, b) => {
 			let dateA = new Date(a.date_watched);
 			let dateB = new Date(b.date_watched);
 			return dateA.getTime() >= dateB? -1 : 1;
+		});
+	}
+
+	this.SortByVoteCount = function() {
+	    this.UnselectAllBullets();
+		document.querySelector("#BtnSortByVoteCount .bullet").classList.add("selected");
+		this.SortData((a, b) => {
+			val = 0;
+			if (a.total_votes > b.total_votes) {
+			    val = -1;
+			}
+			if (b.total_votes > a.total_votes) {
+			    val = 1;
+			}
+			return val;
 		});
 	}
 
@@ -325,99 +338,6 @@ function MovieNightBotConstructor() {
 	}
 
 }
-
-function SuggestedMovie(suggestionJSON) {
-
-	this.suggestionJSON = suggestionJSON;
-	this.domObject = null;
-
-	this.Init = function() {
-		this.domObject = document.createElement('div');
-		let htmlText = '<div id="image"><img id="imgCover" class="coverImage" src="../static/content/images/loading.gif" /></div>'
-		htmlText += '<div id="imdbData" class="imdbData"><a id="imdbLink" href="" target="#"><h2 id="txtTitle"></h2></a><h2 id="txtYear"></h2></div>';
-		htmlText += '<div id="data1"><p id="txtSuggestor"></p><p id="txtSuggestDate"></p></div>';
-		htmlText += '<div id="data2" class="data2"><p id="txtTotalVotes"></p><p id="txtTotalScore"></p></p><p id="txtVoteEvents"></div>';
-//		htmlText += '<div id="health"><div id="background"><div id="bar">100%</div></div></div>'
-		this.domObject.innerHTML = htmlText;
-
-		this.domObject.classList.add("item");
-
-		let imgCover = this.domObject.querySelector("#imgCover");
-		imgCover.onload = function() {
-			if (this.src !== this.getAttribute("data-src"))
-				this.src = this.getAttribute("data-src");
-		}
-		if (this.suggestionJSON.full_size_poster_url != null)
-			imgCover.setAttribute("data-src", this.suggestionJSON.full_size_poster_url);
-		else
-			imgCover.setAttribute("data-src", "../static/content/images/movienotfound.png");
-
-		this.domObject.querySelector("#txtTitle").innerHTML = this.suggestionJSON.title;
-		this.domObject.querySelector("#txtYear").innerHTML = this.suggestionJSON.year;
-		this.domObject.querySelector("#txtSuggestor").innerHTML = "Suggested by: " + this.suggestionJSON.suggestor;
-		let suggestDate = new Date(this.suggestionJSON.date_suggested);
-		this.domObject.querySelector("#txtSuggestDate").innerHTML = "Suggested On: " + suggestDate.toLocaleDateString();
-		this.domObject.querySelector("#txtTotalVotes").innerHTML = "Total Votes: " + this.suggestionJSON.total_votes;
-		this.domObject.querySelector("#txtTotalScore").innerHTML = "Total Score: " + this.suggestionJSON.total_score;
-		this.domObject.querySelector("#txtVoteEvents").innerHTML = "Vote Events Entered: " + this.suggestionJSON.num_votes_entered;
-//		let bar = this.domObject.querySelector("#bar");
-
-		let healthPercentOfMaximum = 0;
-		if (MovieNightBot.maxAveragePopularity != 0 && !isNaN(MovieNightBot.maxAveragePopularity))
-			healthPercentOfMaximum = Math.round((this.suggestionJSON.popularity / MovieNightBot.maxAveragePopularity) * 100);
-
-//		bar.innerHTML = healthPercentOfMaximum + "%";
-//		bar.style.width = healthPercentOfMaximum + "%";
-//		let color = sVector3.Lerp(MovieNightBot.healthRed, MovieNightBot.healthGreen, healthPercentOfMaximum / 100.0);
-//		color.Scale(256);
-//		bar.style.backgroundColor = color.RGB();
-		if (this.suggestionJSON.imdb_id != null)
-			this.domObject.querySelector("#imdbLink").href = "https://www.imdb.com/title/tt" + this.suggestionJSON.imdb_id;
-		else
-			this.domObject.querySelector("#imdbLink").href = "#";
-	}
-}
-
-function WatchedMovie(watchedJSON) {
-	this.watchedJSON = watchedJSON;
-	this.domObject = null;
-
-	this.Init = function() {
-		this.domObject = document.createElement('div');
-		let htmlText = '<div id="image"><img id="imgCover" class="coverImage" src="../static/content/images/loading.gif" /></div>'
-		htmlText += '<div id="imdbData" class="imdbData"><a id="imdbLink" href="" target="#"><h2 id="txtTitle"></h2></a><h2 id="txtYear"></h2></div>';
-		htmlText += '<div id="data1"><p id="txtSuggestor"><p id="txtSuggestDate"></p></p><p id="txtWatchDate"></p></div>';
-		htmlText += '<div id="data2" class="data2"><p id="txtTotalVotes"></p><p id="txtTotalScore"></p><p id="txtVoteEvents"></p></div>';
-		this.domObject.innerHTML = htmlText;
-
-		this.domObject.classList.add("item");
-
-		let imgCover = this.domObject.querySelector("#imgCover");
-		imgCover.onload = function() {
-			if (this.src !== this.getAttribute("data-src"))
-				this.src = this.getAttribute("data-src");
-		}
-		if (this.watchedJSON.full_size_poster_url != null)
-			imgCover.setAttribute("data-src", this.watchedJSON.full_size_poster_url);
-		else
-			imgCover.setAttribute("data-src", "../static/content/images/movienotfound.png");
-
-		this.domObject.querySelector("#txtTitle").innerHTML = this.watchedJSON.title;
-		this.domObject.querySelector("#txtYear").innerHTML = this.watchedJSON.year;
-		this.domObject.querySelector("#txtSuggestor").innerHTML = "Suggested by: " + this.watchedJSON.suggestor;
-		let suggestDate = new Date(this.watchedJSON.date_suggested);
-		let watchDate = new Date(this.watchedJSON.date_watched);
-		this.domObject.querySelector("#txtSuggestDate").innerHTML = "Suggested On: " + suggestDate.toLocaleDateString();
-		this.domObject.querySelector("#txtWatchDate").innerHTML = "Watched On: " + watchDate.toLocaleDateString();
-		this.domObject.querySelector("#txtTotalVotes").innerHTML = "Total Votes: " + this.watchedJSON.total_votes;
-		this.domObject.querySelector("#txtTotalScore").innerHTML = "Total Score: " + this.watchedJSON.total_score;
-		this.domObject.querySelector("#txtVoteEvents").innerHTML = "Vote Events Entered: " + this.watchedJSON.num_votes_entered;
-		if (this.watchedJSON.imdb_id != null)
-			this.domObject.querySelector("#imdbLink").href = "https://www.imdb.com/title/tt" + this.watchedJSON.imdb_id;
-		else
-			this.domObject.querySelector("#imdbLink").href = "#";
-	}
-} 
 
 function SettingsConstructor() {
 	this.itemsPerPage = 10;

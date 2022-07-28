@@ -31,10 +31,25 @@ async def cleanup_messages(
     for message in messages:
         loop.create_task(message.delete(delay=sec_delay))
         # Need sleep here so don't overwhelm API
-        await asyncio.sleep(0.25)
+        await asyncio.sleep(0.2)
+
+
+async def delete_thread(thread: discord.Thread, sec_delay: int = 10) -> None:
+    """Deletes a list of messages off a server
+
+    Parameters
+    ----------
+    thread : List of doscord.Message objects
+        The messages to delete
+    sec_delay : int
+        The number of seconds to wait before deleting the message. Default 10
+    """
+    await asyncio.sleep(sec_delay)
+    await thread.delete()
 
 
 def build_vote_embed(server_id: int):
+    from movienightbot.application import client
     server_row = ServerController().get_by_id(server_id)
     try:
         movie_rows = MovieVoteController().get_movies_for_server_vote(server_id)
@@ -63,6 +78,12 @@ End the vote with the :octagonal_sign: emoji.""",
             value=score,
             inline=False,
         )
+
+    embed.add_field(
+        name="View more details here:",
+        value=f"{client.config.base_url}/vote.html?server={server_id}",
+        inline=False,
+    )
     embed.set_footer(text="Movie time is")
     today = datetime.datetime.utcnow().date()
     movie_hour, movie_minute = server_row.movie_time.split(":")
