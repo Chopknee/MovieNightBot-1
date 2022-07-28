@@ -98,20 +98,53 @@ class BotRequestHandler(BaseHTTPRequestHandler):
         suggested = {"watched": watched_list, "server_id": server_id}
         self.wfile.write(json.dumps(suggested).encode())
 
+    # def build_user_vote_json(self, server_id: int, user_id: int) -> Dict[str, Any]:
+    #     user_name = ""
+    #     user_id_j = ""
+    #     user_votes = self.user_vote_controller.get_by_server_and_user(server_id, user_id) or [];
+    #     user_votes_data = [];
+    #     for user_vote in user_votes:
+    #         user_vote_data = {
+    #             "movie_vote_id": user_vote.movie_vote.id,
+    #             "vote_rank": user_vote.vote_rank
+    #         }
+    #         user_name = user_vote.user_name
+    #         user_id_j = user_vote.user_id
+    #         user_votes_data.append(user_vote_data);
+    #
+    #     user_info = {
+    #         "user_name": user_name,
+    #         "user_id": user_id_j,
+    #         "votes": user_votes_data
+    #     }
+    #     return user_info
+
     def get_vote_json(self, server_id: int):
         try:
-            movies_vote_data = self.movie_vote_controller.get_movies_for_server_vote(server_id)
+            movies_vote_data = self.movie_vote_controller.get_movies_for_server_vote(server_id) or []
         except Vote.DoesNotExist:
             movies_vote_data = []
 
         movies_list = []
         for movie_vote in movies_vote_data:
             movie_info = self.build_movie_base_info(movie_vote.movie)
-            movie_info.update({"score": movie_vote.score})
+            movie_info.update({"score": movie_vote.score, "vote_id": movie_vote.id})
             movies_list.append(movie_info)
 
+        user_names = self.user_vote_controller.get_usernames_voted(server_id)
+        print(len(user_names))
+        # users_votes_list = []
+
+        # for user_id in user_ids:
+        #     user_vote = self.build_user_vote_json(server_id, user_id.user_id)
+        #     users_votes_list.append(user_vote)
+
         self.set_json_headers()
-        vote_info = {"movies": movies_list}
+        vote_info = {
+            "movies": movies_list,
+            # "user_votes": users_votes_list,
+            "voter_count": len(user_names)
+        }
         self.wfile.write(json.dumps(vote_info).encode())
 
     def serve_static(self, path: str):
