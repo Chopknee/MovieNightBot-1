@@ -1,3 +1,5 @@
+import random
+from math import floor
 from typing import List, Union, Dict, Any, Optional
 from string import ascii_lowercase
 from collections import defaultdict
@@ -131,14 +133,8 @@ class MoviesController(BaseController):
         )
 
     def get_random_movies(self, server_id: int, num_movies: int, genres: Optional[List[str]] = None) -> List[Movie]:
-        if genres is None:
-            return (
-                Movie.select()
-                .order_by(pw.fn.Random())
-                .where((Movie.server == server_id) & Movie.watched_on.is_null(True))
-                .limit(num_movies)
-            )
-        else:
+        # if genre is specified, go with sql random
+        if genres is not None:
             return (
                 Movie.select()
                 .join(MovieGenre)
@@ -148,6 +144,67 @@ class MoviesController(BaseController):
                 )
                 .limit(num_movies)
             )
+
+        # calculate the new vs old split
+        total_count = (Movie.select(Movie.id)
+                       .where((Movie.server == server_id) & Movie.watched_on.is_null(True))
+                       .count())
+        new_count = (Movie.select(Movie.id)
+                     .where((Movie.server == server_id)
+                            & Movie.watched_on.is_null(True)
+                            & (Movie.num_votes_entered == 0))
+                     .count())
+
+        # prevent errors by limiting the total number if db has too few options
+        if total_count < num_movies:
+            num_movies = total_count
+
+        # calculate the actual split counts
+        new_split = round((new_count / total_count) * num_movies)
+        old_split = num_movies - new_split
+
+        # Guarantee at least one new movie will show up, if there is at least one in the list
+        if new_split == 0 & new_count > 0:
+            new_split = 1
+            old_split = num_movies - new_split
+
+        # query the movies based on the split
+        # for the sake of not knowing how to coax sql into doing this, I'll do this with python
+        ids = []
+
+        new_movies = (Movie.select(Movie.id)
+                      .order_by(pw.fn.Random())
+                      .where((Movie.server == server_id)
+                             & Movie.watched_on.is_null(True)
+                             & (Movie.num_votes_entered == 0))
+                      .limit(new_split))
+
+        # add new movie options (selected at random by sql) to the list
+        for movie in new_movies:
+            ids.append(movie.id)
+
+        # query movie scores and add to list sorted by the avg score descending
+        old_movies = (Movie.select(Movie.id, (Movie.total_score / Movie.num_votes_entered).alias('avg_score'))
+                      .order_by(pw.SQL("avg_score").desc())
+                      .where((Movie.server == server_id)
+                             & Movie.watched_on.is_null(True)
+                             & (Movie.num_votes_entered > 0)))
+
+        old_ids = []
+        for movie in old_movies:
+            old_ids.append(movie.id)
+
+        # select old movies at random with a skewed to favor more popular options
+        for i in range(old_split):
+            # apply a curve to a random number (in this case an inverse cubic function)
+            a = pow(1.0 - random.random(), 3)
+            index = floor(a * len(old_ids))
+            ids.append(old_ids[index])
+            old_ids.pop(index)
+
+        # generate a query with the selected ids returning all table data
+        return (Movie.select()
+                .where(Movie.id.in_(ids)))
 
 
 def movie_score_weightings(server_id: int) -> Dict[int, float]:
@@ -190,7 +247,7 @@ class VoteController(BaseController):
         with self.transaction():
             server_row = ServerController().get_by_id(server_id)
             num_movies = server_row.num_movies_per_vote
-            movies_for_vote = MoviesController().get_random_movies(server_id, num_movies, genres)
+            movies_for_vote = MoviesController().get_random_movies2(server_id, num_movies, genres)
             if len(movies_for_vote) == 0:
                 raise VoteError("No movies found")
             vote_row = self.create({"server_id": server_id})
