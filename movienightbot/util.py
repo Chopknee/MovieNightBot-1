@@ -172,3 +172,5 @@ async def generate_invite_link(permissions=DEFAULT_PERMISSIONS, guild=None):
     if guild is not None:
         args["guild"] = guild
     return discord.utils.oauth_url(**args)
+
+async def

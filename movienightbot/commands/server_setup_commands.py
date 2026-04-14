@@ -174,7 +174,21 @@ class ServerAdmin(app_commands.Group):
             server_row.num_votes_per_user = int(num_votes_per_user)
             self.server_controller.update(server_row)
             await interaction.response.send_message(f"Number of votes per user updated to {num_votes_per_user}")
-
+    
+    @app_commands.command(description="Enable or disable display of vote scores for movies during a vote.")
+    @app_commands.default_permissions(administrator=True)
+    async def vote_score_display(self, interaction: discord.Interaction, vote_scores: bool):
+        self.server_controller.add_show_vote_scores_column() # Unless there's a better way.
+        server_row = self.server_controller.get_by_id(interaction.guild.id)
+        server_row.show_vote_scores = vote_scores
+        self.server_controller.update(server_row)
+        option = "on" if vote_scores else "off"
+        await interaction.response.send_message(f"Display of vote scores on voting embed is now {option}")
+    
+    @app_commands.command(description="Triggers a scan of all movies for this server to ensure poster art loads successfully. This only applies to movies with an imdb id.")
+    @app_commands.default_permissions(administrator=True)
+    async def refresh_posters(self, interaction: discord.Interaction):
+        pass
 
 async def setup(bot):
     bot.tree.add_command(ServerAdmin(name="server", description="Admin commands for MovieNightBot server setup"))

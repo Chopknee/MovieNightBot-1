@@ -22,9 +22,23 @@ from .models import (
 
 logger = logging.getLogger("movienightbot")
 
+from playhouse.migrate import *
+
 
 class ServerController(BaseController):
     model = Server
+
+    def add_show_vote_scores_column(self):
+        for col in self.database.get_columns('servers'):
+            if col.name == 'show_vote_scores':
+                return
+        
+        logger.info("Upgrading servers table schema with show_vote_scores column.")
+        migrator = SqliteMigrator(self.database)
+        with self.database.atomic():
+            migrate(
+                migrator.add_column('servers', 'show_vote_scores', pw.BooleanField(null=False, default=True))
+            )
 
 
 class IMDBInfoController(BaseController):

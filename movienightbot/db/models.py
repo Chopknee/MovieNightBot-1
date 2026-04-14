@@ -16,6 +16,7 @@ class Server(BaseModel):
     check_movie_names = pw.BooleanField(null=False, default=False)
     message_timeout = pw.SmallIntegerField(null=False, default=10)
     allow_tv_shows = pw.BooleanField(null=False, default=False)
+    show_vote_scores = pw.BooleanField(null=False, default=True)
 
     class Meta:
         table_name = "servers"
